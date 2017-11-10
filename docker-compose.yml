@@ -1,0 +1,9 @@
+version: : 3
+services:
+  api:
+    image: alexeybelous/alexeybelous/ubuntu-dotnetcore2
+    ports: 
+      - "8080:8080"
+    volumes:
+      - ./shared/:/shared/
+    command: /bin/bash -c "cd /shared/ && sh ./run-app.sh"
