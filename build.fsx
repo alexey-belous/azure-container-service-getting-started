@@ -6,12 +6,14 @@
 
 open Fake
 open System
+open System.IO
 
 // --------------------------------------------------------------------------------------
 // Build variables
 // --------------------------------------------------------------------------------------
 
 let buildDir  = "./build/"
+let outputDir = "./shared/app"
 let appReferences = !! "/**/*.fsproj"
 let dotnetcliVersion = "2.0.2"
 let mutable dotnetExePath = "dotnet"
@@ -19,6 +21,16 @@ let mutable dotnetExePath = "dotnet"
 // --------------------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------------------
+
+let CleanDirExcept pattern dir =
+    !! (dir @@ "**/*.*")
+        -- (dir @@ pattern)
+        |> DeleteFiles
+    // deletes all subdirectories
+    let rec deleteDirs actDir =
+        Directory.GetDirectories(actDir) |> Seq.iter deleteDirs
+        Directory.Delete(actDir, true)
+    Directory.GetDirectories dir |> Seq.iter deleteDirs
 
 let run' timeout cmd args dir =
     if execProcess (fun info ->
@@ -44,7 +56,8 @@ let runDotnet workingDir args =
 // --------------------------------------------------------------------------------------
 
 Target "Clean" (fun _ ->
-    CleanDirs [buildDir]
+    [buildDir; outputDir]
+    |> Seq.iter (CleanDirExcept "*.gitignore")
 )
 
 Target "InstallDotNetCLI" (fun _ ->
@@ -67,6 +80,15 @@ Target "Build" (fun _ ->
     )
 )
 
+Target "Publish" (fun _ -> 
+    appReferences
+    |> Seq.iter (fun p -> 
+        let dir = System.IO.Path.GetDirectoryName p
+        sprintf "publish -o %s" ("../.." @@ outputDir)
+        |> runDotnet dir
+    )
+)
+
 // --------------------------------------------------------------------------------------
 // Build order
 // --------------------------------------------------------------------------------------
@@ -75,5 +97,10 @@ Target "Build" (fun _ ->
   ==> "InstallDotNetCLI"
   ==> "Restore"
   ==> "Build"
+
+"Clean"
+  ==> "InstallDotNetCLI"
+  ==> "Restore"
+  ==> "Publish"
 
 RunTargetOrDefault "Build"
